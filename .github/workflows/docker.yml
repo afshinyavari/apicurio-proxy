@@ -1,4 +1,5 @@
-# Builds and tests the proxy, then pushes the image to Docker Hub.
+# Builds and tests the proxy (unit and Quarkus tests, then a smoke test of the built image over
+# TLS and mTLS), then pushes the image to Docker Hub.
 #
 #   push to main      -> <user>/apicurio-rbac-proxy:latest and :sha-<short sha>
 #   tag v1.2.3        -> :1.2.3, :1.2 and :latest
@@ -34,6 +35,18 @@ jobs:
         run: mvn -B package
 
       - uses: docker/setup-buildx-action@v4
+
+      # The image as it will be pushed, loaded locally so it can be started and tested first.
+      - name: Build image for the smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: apicurio-rbac-proxy:smoke
+
+      - name: Smoke test (TLS, mTLS, principal mapping, policy reload)
+        run: e2e/smoke-test.sh apicurio-rbac-proxy:smoke
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
