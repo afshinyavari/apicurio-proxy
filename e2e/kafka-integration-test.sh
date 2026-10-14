@@ -5,12 +5,14 @@
 # ssl.principal.mapping.rules.
 #
 #   e2e/kafka-integration-test.sh <image>
+#   KAFKA_IMAGE=apache/kafka:4.2.2 e2e/kafka-integration-test.sh <image>   (another broker version)
 #
 # Needs docker, openssl, python3 and curl, and free ports 18080, 18443 and 19092-19094.
 set -euo pipefail
 
 IMAGE=${1:?usage: $0 <image>}
-KAFKA_IMAGE=apache/kafka:4.3.1
+# The broker image: KAFKA_IMAGE, or the version Dependabot keeps current in e2e/kafka/Dockerfile.
+KAFKA_IMAGE=${KAFKA_IMAGE:-$(sed -n 's/^FROM //p' "$(dirname "$0")/kafka/Dockerfile")}
 KAFKA_CONTAINER=apicurio-rbac-proxy-kafka-$$
 MAPPING_RULES='RULE:^CN=([^,]+),O=Acme$/CN=$1/,DEFAULT'
 WORK=$(mktemp -d)
