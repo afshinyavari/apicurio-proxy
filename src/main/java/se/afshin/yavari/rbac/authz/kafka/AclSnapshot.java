@@ -33,6 +33,11 @@ public record AclSnapshot(List<AclBinding> bindings) {
         bindings = List.copyOf(bindings);
     }
 
+    /** Distinct principals the bindings name, {@code User:*} included. */
+    public long principalCount() {
+        return bindings.stream().map(b -> b.entry().principal()).distinct().count();
+    }
+
     /** Some topic operation granting {@code action} is allowed and not denied. */
     public boolean allows(String principal, String artifact, Action action) {
         String topic = topicOf(artifact);

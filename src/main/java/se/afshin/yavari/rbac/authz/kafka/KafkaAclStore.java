@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -81,8 +82,14 @@ public class KafkaAclStore {
     void refresh() {
         if (loader == null) return;
         try {
+            AclSnapshot previous = snapshot;
             update(loader.get());
-            Log.debugf("Loaded %d ACL bindings", snapshot.bindings().size());
+            AclSnapshot current = snapshot;
+            // Logged on the first load and whenever the ACLs change, not on every refresh.
+            if (previous == null || !Set.copyOf(previous.bindings()).equals(Set.copyOf(current.bindings()))) {
+                Log.infof("Loaded %d ACL bindings for %d principals",
+                        current.bindings().size(), current.principalCount());
+            }
         } catch (Exception e) {
             AclSnapshot kept = snapshot;
             Log.errorf("ACL refresh failed, keeping %s: %s",
