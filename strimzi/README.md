@@ -267,24 +267,5 @@ Every request is one line on the `audit` log category, e.g.
 
 ## Environment reference
 
-Every setting is a Quarkus config property; the variables below are their environment form
-(`proxy.kafka.bootstrap` → `PROXY_KAFKA_BOOTSTRAP`). Any other Quarkus property can be set
-the same way.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `PROXY_APICURIO_URL` | `http://apicurio:8080` | The registry behind the proxy. |
-| `PROXY_POLICY_FILE` | `/opt/rbac/policy.yaml` | The policy file. |
-| `PROXY_POLICY_RELOAD_INTERVAL` | `5s` | How often `policy.yaml` is checked for changed content. |
-| `PROXY_TLS_CERT`, `PROXY_TLS_KEY` | — | Server identity as PEM files; setting them enables the HTTPS listener (port `QUARKUS_HTTP_SSL_PORT`, default 8443). |
-| `PROXY_TLS_CA` | — | PEM file with the CAs client certificates must chain to; may hold several. |
-| `QUARKUS_HTTP_INSECURE_REQUESTS` | `enabled` | `disabled` closes the plain-HTTP port (only together with TLS). |
-| `PROXY_MTLS_PRINCIPAL_MAPPING_RULES` | `DEFAULT` | The brokers' `ssl.principal.mapping.rules`, verbatim; an invalid rule list fails startup. |
-| `PROXY_KAFKA_BOOTSTRAP` | — | Enables the Kafka ACL source. Without it certificate callers get only what `principals` in `policy.yaml` grants. |
-| `PROXY_KAFKA_SECURITY_PROTOCOL` | `SSL` | `SSL` or `PLAINTEXT`. |
-| `PROXY_KAFKA_SSL_CERT`, `PROXY_KAFKA_SSL_KEY` | — | Proxy's Kafka client identity as PEM files (PKCS#8 key). |
-| `PROXY_KAFKA_SSL_CA` | — | PEM file with the CAs the Kafka listener's certificate chains to; may hold several. |
-| `PROXY_KAFKA_ACL_REFRESH_INTERVAL` | `30s` | ACL snapshot refresh interval. |
-| `QUARKUS_OIDC_AUTH_SERVER_URL` | — | The OIDC issuer. Required unless `QUARKUS_OIDC_TENANT_ENABLED=false`. |
-| `QUARKUS_OIDC_ROLES_ROLE_CLAIM_PATH` | `groups` | Token claim holding the caller's groups (e.g. `realm_access/roles` for Keycloak realm roles). |
-| `QUARKUS_OIDC_TENANT_ENABLED` | `true` | `false` runs the proxy without an OIDC provider (mTLS only). |
+All environment variables, their defaults and what they are for are listed in the
+[top-level README](../README.md#configuration).
