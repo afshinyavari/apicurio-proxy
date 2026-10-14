@@ -103,6 +103,8 @@ put() { as "$1" -X PUT -H 'Content-Type: application/json' -d '{}' "$2"; }
 del() { as "$1" -X DELETE "$2"; }
 
 check "readiness: ACL snapshot loaded from Kafka"    200 "$(status "$PROXY/q/health/ready")"
+check "log: bindings and principals loaded"          1 \
+    "$(docker logs "$PROXY_CONTAINER" 2>&1 | grep -c 'Loaded 6 ACL bindings for 4 principals' || true)"
 check "WRITE on topic: read its subject"             200 "$(as orders-service "$ARTIFACTS/orders-value")"
 check "WRITE on topic: write its subject"            200 "$(put orders-service "$ARTIFACTS/orders-value")"
 check "WRITE on topic: no delete"                    403 "$(del orders-service "$ARTIFACTS/orders-value")"
@@ -118,6 +120,8 @@ check "Kafka DENY vetoes a policy grant"             403 "$(put orders-service "
 # ── ACL changes reach the proxy on its next refresh ─────────────────────────
 acl --add --allow-principal User:CN=orders-service --operation Read --topic invoices
 eventually "added ACL is applied"   200 15 orders-service "$ARTIFACTS/invoices-value"
+check "log: changed ACLs are logged again"           1 \
+    "$(docker logs "$PROXY_CONTAINER" 2>&1 | grep -c 'Loaded 7 ACL bindings for 4 principals' || true)"
 acl --remove --force --allow-principal User:CN=orders-service --operation Write --topic orders
 eventually "removed ACL is applied" 403 15 orders-service -X PUT -H 'Content-Type: application/json' -d '{}' \
     "$ARTIFACTS/orders-value"

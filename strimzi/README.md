@@ -224,7 +224,8 @@ kubectl apply -f apicurio-operator-sidecar.yaml
 kubectl -n kafka logs deploy/registry-app-deployment -c rbac-proxy | grep -E 'PolicyStore|KafkaAclStore|Listening'
 ```
 
-Expected on start: `Loaded N policy rules from …` and `Listening on: https://0.0.0.0:8443`.
+Expected on start: `Loaded N policy rules from …`, `Loaded N ACL bindings for M principals`
+(again whenever the ACLs in Kafka change) and `Listening on: https://0.0.0.0:8443`.
 Readiness is down until the policy is loaded and the first ACL snapshot has been fetched (an
 ACL refresh failure is logged as `ACL refresh failed`).
 

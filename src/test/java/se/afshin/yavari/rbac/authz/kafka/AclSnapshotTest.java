@@ -144,6 +144,17 @@ class AclSnapshotTest {
     }
 
     @Test
+    void principalsAreCountedOnce() {
+        AclSnapshot acls = snapshot(
+                allow("orders", PatternType.LITERAL, AclOperation.WRITE),
+                allow("payments", PatternType.LITERAL, AclOperation.READ),
+                deny("CN=other", "orders", PatternType.LITERAL, AclOperation.ALL),
+                acl("*", ResourceType.TOPIC, "shared", PatternType.LITERAL, AclOperation.READ, AclPermissionType.ALLOW));
+        assertThat(acls.principalCount()).isEqualTo(3);
+        assertThat(AclSnapshot.EMPTY.principalCount()).isZero();
+    }
+
+    @Test
     void emptySnapshotAllowsNothing() {
         assertThat(AclSnapshot.EMPTY.allows(SVC, "orders", READ)).isFalse();
     }
