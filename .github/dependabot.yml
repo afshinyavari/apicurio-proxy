@@ -1,0 +1,13 @@
+# Weekly PRs for a new UBI base image (Dockerfile, tag and digest) and new GitHub Actions versions.
+# Each PR is built and tested by the docker workflow before it is merged.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
