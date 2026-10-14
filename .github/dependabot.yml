@@ -1,6 +1,7 @@
 # Weekly PRs for new versions of the Java dependencies, the UBI base image (Dockerfile, tag and
-# digest) and the GitHub Actions. Each PR runs the docker workflow: unit and Quarkus tests, then a
-# smoke test of the built image over TLS and mTLS. Nothing is pushed to Docker Hub from a PR.
+# digest) and the GitHub Actions. Each PR runs the docker workflow: unit and Quarkus tests, then
+# the built image tested over TLS and mTLS and against a real Kafka broker. Nothing is pushed to
+# Docker Hub from a PR.
 version: 2
 updates:
   - package-ecosystem: maven

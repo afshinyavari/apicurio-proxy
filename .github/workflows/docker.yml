@@ -1,5 +1,5 @@
-# Builds and tests the proxy (unit and Quarkus tests, then a smoke test of the built image over
-# TLS and mTLS), then pushes the image to Docker Hub.
+# Builds and tests the proxy (unit and Quarkus tests, then the built image: a smoke test over TLS
+# and mTLS, and an integration test against a real Kafka broker), then pushes it to Docker Hub.
 #
 #   push to main      -> <user>/apicurio-rbac-proxy:latest and :sha-<short sha>
 #   tag v1.2.3        -> :1.2.3, :1.2 and :latest
@@ -47,6 +47,9 @@ jobs:
 
       - name: Smoke test (TLS, mTLS, principal mapping, policy reload)
         run: e2e/smoke-test.sh apicurio-rbac-proxy:smoke
+
+      - name: Kafka integration test (ACLs read from a real broker)
+        run: e2e/kafka-integration-test.sh apicurio-rbac-proxy:smoke
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
