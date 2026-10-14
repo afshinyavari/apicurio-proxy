@@ -1,0 +1,129 @@
+# Proxy as a sidecar on a registry managed by the Apicurio Registry 3 operator (CRD ApicurioRegistry3,
+# checked against operator and registry 3.3.3). mTLS only: no OIDC provider is involved.
+#
+# spec.app.podTemplateSpec is the base the operator builds the pod from, so the proxy container and
+# its volumes are simply added next to the operator's own container (apicurio-registry-app).
+#
+# The registry's API port 8080 is bound to loopback, so only the proxy in the same pod reaches it.
+# The operator's probes use the management port 9000 and are not affected. The NetworkPolicy at the
+# bottom is a second barrier for CNIs that enforce policies.
+#
+# All certificates are cert-manager Secrets with the standard keys tls.crt / tls.key (certificates.yaml),
+# and every trust anchor comes from the CA bundle Secret tls-trust-bundle (key ca-bundle.crt).
+# No Strimzi CA Secret is used: Kafka is reached on a listener whose certificates chain to those CAs.
+#
+# All names below are examples: Kafka cluster "my-cluster", namespace "kafka", registry "registry".
+# Secrets and the policy ConfigMap are listed in README.md. A change to the policy ConfigMap is
+# picked up by the running proxy; no restart is needed.
+apiVersion: registry.apicur.io/v1
+kind: ApicurioRegistry3
+metadata:
+  name: registry
+  namespace: kafka
+spec:
+  app:
+    replicas: 1
+    storage:
+      type: kafkasql
+      kafkasql:
+        bootstrapServers: my-cluster-kafka-bootstrap:9093
+        # No `tls` block: it takes PKCS12 files with a password. The registry's Kafka client is
+        # given the PEM material of the cert-manager Secret through env below instead.
+    env:
+      - { name: QUARKUS_HTTP_HOST, value: "127.0.0.1" }   # API only reachable from inside the pod
+      # Kafka over mTLS with the registry's own client certificate (PKCS#8 key) and the CA bundle.
+      - { name: APICURIO_KAFKA_COMMON_SECURITY_PROTOCOL, value: SSL }
+      - { name: APICURIO_KAFKA_COMMON_SSL_KEYSTORE_TYPE, value: PEM }
+      - name: APICURIO_KAFKA_COMMON_SSL_KEYSTORE_CERTIFICATE_CHAIN
+        valueFrom: { secretKeyRef: { name: apicurio-registry-kafka, key: tls.crt } }
+      - name: APICURIO_KAFKA_COMMON_SSL_KEYSTORE_KEY
+        valueFrom: { secretKeyRef: { name: apicurio-registry-kafka, key: tls.key } }
+      - { name: APICURIO_KAFKA_COMMON_SSL_TRUSTSTORE_TYPE, value: PEM }
+      - name: APICURIO_KAFKA_COMMON_SSL_TRUSTSTORE_CERTIFICATES
+        valueFrom: { secretKeyRef: { name: tls-trust-bundle, key: ca-bundle.crt } }
+    # The operator's own NetworkPolicy opens 8080 and 9000 and nothing else; ours opens 8443.
+    networkPolicy:
+      enabled: false
+    # No Ingress to port 8080; expose the proxy Service below instead.
+    ingress:
+      enabled: false
+    podTemplateSpec:
+      spec:
+        containers:
+          - name: rbac-proxy
+            image: registry.example.com/apicurio-rbac-proxy:1.0
+            ports:
+              - { name: https, containerPort: 8443 }
+            env:
+              - { name: PROXY_APICURIO_URL, value: "http://127.0.0.1:8080" }   # same pod
+              - { name: PROXY_POLICY_FILE, value: /opt/rbac/policy.yaml }
+              # mTLS only. Without this the proxy refuses to start when QUARKUS_OIDC_AUTH_SERVER_URL is unset.
+              # To add OIDC for humans later, remove it and set QUARKUS_OIDC_AUTH_SERVER_URL (groups are read from the "groups" claim).
+              - { name: QUARKUS_OIDC_TENANT_ENABLED, value: "false" }
+              # HTTPS listener: server certificate + the CAs that client certificates must chain to
+              # (every CA in the bundle, so a certificate from any of them is authenticated).
+              - { name: QUARKUS_HTTP_INSECURE_REQUESTS, value: disabled }   # HTTPS only
+              - { name: PROXY_TLS_CERT, value: /tls/server/tls.crt }
+              - { name: PROXY_TLS_KEY,  value: /tls/server/tls.key }
+              - { name: PROXY_TLS_CA,   value: /tls/trust/ca-bundle.crt }
+              - { name: PROXY_MTLS_PRINCIPAL_MAPPING_RULES, value: DEFAULT }   # the brokers' ssl.principal.mapping.rules, verbatim
+              # Authorization from Kafka topic ACLs, read with the proxy's own client certificate
+              # (principal CN=apicurio-proxy-kafka, ACL in kafkauser.yaml). Drop these four and the
+              # kafka-tls volume to authorize from the `principals` section of policy.yaml only.
+              - { name: PROXY_KAFKA_BOOTSTRAP, value: my-cluster-kafka-bootstrap:9093 }
+              - { name: PROXY_KAFKA_SSL_CERT, value: /tls/kafka/tls.crt }
+              - { name: PROXY_KAFKA_SSL_KEY,  value: /tls/kafka/tls.key }
+              - { name: PROXY_KAFKA_SSL_CA,   value: /tls/trust/ca-bundle.crt }
+            volumeMounts:
+              - { name: server-tls,   mountPath: /tls/server, readOnly: true }
+              - { name: kafka-tls,    mountPath: /tls/kafka,  readOnly: true }
+              - { name: trust-bundle, mountPath: /tls/trust,  readOnly: true }
+              - { name: policy,       mountPath: /opt/rbac,   readOnly: true }
+            readinessProbe:
+              httpGet: { path: /q/health/ready, port: 8443, scheme: HTTPS }
+              initialDelaySeconds: 5
+            livenessProbe:
+              httpGet: { path: /q/health/live, port: 8443, scheme: HTTPS }
+              initialDelaySeconds: 15
+        volumes:
+          - { name: server-tls,   secret: { secretName: apicurio-proxy-server-tls } }
+          - { name: kafka-tls,    secret: { secretName: apicurio-proxy-kafka } }
+          - { name: trust-bundle, secret: { secretName: tls-trust-bundle } }
+          - { name: policy,       configMap: { name: apicurio-proxy-policy } }
+  # The UI calls the registry API from the browser, which has no client certificate.
+  ui:
+    enabled: false
+---
+# Exposes only the proxy. The operator's own Service (registry-app-service, port 8080) still
+# exists but leads to a port that is bound to loopback.
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-rbac
+  namespace: kafka
+spec:
+  selector:                            # labels the operator puts on the app pods of CR "registry"
+    app.kubernetes.io/name: apicurio-registry
+    app.kubernetes.io/component: app
+    app.kubernetes.io/instance: registry
+  ports:
+    - { name: https, port: 8443, targetPort: 8443 }
+---
+# Only 8443 may be reached from outside the pod. Kubelet probes are not subject to
+# NetworkPolicy in the common CNIs. To scrape registry metrics, also allow port 9000 from
+# your monitoring namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: registry-only-via-proxy
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: apicurio-registry
+      app.kubernetes.io/component: app
+      app.kubernetes.io/instance: registry
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 8443 }

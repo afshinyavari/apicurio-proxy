@@ -1,0 +1,52 @@
+# The three certificates the manifest mounts, issued by cert-manager. Each Secret gets the standard
+# keys tls.crt / tls.key (and ca.crt, which is not used: trust comes from the Secret tls-trust-bundle).
+#
+# privateKey.encoding must be PKCS8: cert-manager writes PKCS#1 by default, which Kafka clients
+# (the proxy's ACL reader, the registry's kafkasql storage) cannot read.
+#
+# The subject of a client certificate is its Kafka principal. With only a commonName it is
+# "CN=<name>", which is what a Strimzi KafkaUser of that name gets its ACLs for (kafkauser.yaml).
+#
+# Names are examples: issuer "org-ca-issuer", namespace "kafka".
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: apicurio-proxy-server-tls
+  namespace: kafka
+spec:
+  secretName: apicurio-proxy-server-tls
+  issuerRef: { kind: ClusterIssuer, name: org-ca-issuer }
+  commonName: registry-rbac.kafka.svc
+  dnsNames:                            # every name clients use for the proxy Service (registry-rbac is
+                                       # the operator-sidecar one; see the Service in your manifest)
+    - registry-rbac
+    - registry-rbac.kafka.svc
+    - registry-rbac.kafka.svc.cluster.local
+  usages: [server auth]
+  privateKey: { algorithm: RSA, size: 2048, encoding: PKCS8, rotationPolicy: Always }
+---
+# The proxy's Kafka client certificate: principal CN=apicurio-proxy-kafka.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: apicurio-proxy-kafka
+  namespace: kafka
+spec:
+  secretName: apicurio-proxy-kafka
+  issuerRef: { kind: ClusterIssuer, name: org-ca-issuer }
+  commonName: apicurio-proxy-kafka
+  usages: [client auth]
+  privateKey: { algorithm: RSA, size: 2048, encoding: PKCS8, rotationPolicy: Always }
+---
+# The registry's Kafka client certificate for kafkasql storage: principal CN=apicurio-registry-kafka.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: apicurio-registry-kafka
+  namespace: kafka
+spec:
+  secretName: apicurio-registry-kafka
+  issuerRef: { kind: ClusterIssuer, name: org-ca-issuer }
+  commonName: apicurio-registry-kafka
+  usages: [client auth]
+  privateKey: { algorithm: RSA, size: 2048, encoding: PKCS8, rotationPolicy: Always }

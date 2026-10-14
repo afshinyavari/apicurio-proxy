@@ -1,0 +1,11 @@
+rules:
+  - groups: [orders-team]
+    artifacts: [orders]
+    actions: [READ, WRITE]
+  - groups: [invoices-team]
+    principals: ["CN=payments-app"]
+    artifacts: [invoices]
+    actions: [READ, WRITE]
+  - groups: [schema-admin]
+    artifacts: ["*"]
+    actions: [READ, WRITE, DELETE]

@@ -1,0 +1,28 @@
+# Schema RBAC policy
+#
+# Each rule grants its actions on its artifacts to:
+#   groups:     OIDC callers in any of these groups (token claim QUARKUS_OIDC_ROLES_ROLE_CLAIM_PATH,
+#               default "groups")
+#   principals: mTLS callers with this Kafka principal, as PROXY_MTLS_PRINCIPAL_MAPPING_RULES derives
+#               it from the certificate (default: the subject DN, e.g. "CN=ci-pipeline"). A "User:"
+#               prefix is accepted. These grants add to the caller's Kafka ACLs; a Kafka DENY on the
+#               same topic and operation still wins.
+#
+# artifacts: exact artifact ids (e.g. "orders-value"), or "*" for every artifact.
+# actions:   READ, WRITE, DELETE
+#
+# The file is reloaded without a restart when its content changes.
+
+rules:
+  - groups: [orders-team]
+    artifacts: [orders-value, orders-key]
+    actions: [READ, WRITE]
+
+  - groups: [invoices-team]
+    artifacts: [invoices-value, invoices-key]
+    actions: [READ, WRITE]
+
+  - groups: [schema-admin]
+    principals: ["CN=ci-pipeline"]
+    artifacts: ["*"]
+    actions: [READ, WRITE, DELETE]
