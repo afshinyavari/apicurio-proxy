@@ -69,14 +69,17 @@ rules:
 
 ## Build
 
+The pipeline publishes the image to Docker Hub as `apicurio-rbac-proxy` (`:latest` from `main`,
+`:<version>` from a `v<version>` tag); point `image:` in `apicurio-operator-sidecar.yaml` at it. To
+build it yourself:
+
 ```bash
-cd apicurio-proxy
-mvn -q package -DskipTests
+mvn package
 docker build -t registry.example.com/apicurio-rbac-proxy:1.0 .
 docker push registry.example.com/apicurio-rbac-proxy:1.0
 ```
 
-The module builds standalone (no other part of this repository is needed).
+Building, the tests and the pipeline are described in the [top-level README](../README.md).
 
 ## Policy file
 
