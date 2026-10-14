@@ -131,7 +131,8 @@ push to `main`:
 | tag `v1.2.3` | `:1.2.3`, `:1.2`, `:latest` |
 | pull request | nothing is pushed |
 
-Pushing needs the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
+Pushing needs the repository variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`. Each
+run that pushes lists the image, its tags and its digest in the run summary.
 
 `main` is protected: changes go through a pull request, and the `build` check must pass before it
 can be merged. This applies to admins too.
