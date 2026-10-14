@@ -6,10 +6,12 @@
 
     <groupId>se.afshin.yavari</groupId>
     <artifactId>apicurio-rbac-proxy</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <!-- Set from the git tag by CI (-Drevision=1.2.3); local builds are 0.0.0-SNAPSHOT. -->
+    <version>${revision}</version>
     <packaging>jar</packaging>
 
     <properties>
+        <revision>0.0.0-SNAPSHOT</revision>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <quarkus.platform.version>3.40.1</quarkus.platform.version>

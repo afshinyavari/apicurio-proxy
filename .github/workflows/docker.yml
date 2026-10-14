@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # all tags, for git describe
 
       - uses: actions/setup-java@v6
         with:
@@ -31,8 +33,14 @@ jobs:
           java-version: "21"
           cache: maven
 
+      # v1.2.3 -> 1.2.3; commits after a tag -> 1.2.3-<n>-g<sha>. The application reports it on
+      # startup, and the image is tagged from the git tag by the metadata step below.
+      - name: Version from the git tag
+        id: version
+        run: echo "revision=$(git describe --tags --always | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
       - name: Build and test
-        run: mvn -B package
+        run: mvn -B package -Drevision=${{ steps.version.outputs.revision }}
 
       - uses: docker/setup-buildx-action@v4
 
