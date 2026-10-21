@@ -63,7 +63,8 @@ empty value counts as unset. Any other Quarkus property can be set the same way.
 | Variable | Default | Purpose |
 |---|---|---|
 | `QUARKUS_LOG_LEVEL` | `INFO` | Log level. |
-| `QUARKUS_LOG_CATEGORY__AUDIT__LEVEL` | `INFO` | The audit log, one line per authenticated request (`principal=… action=… artifact=… decision=… status=…`); `WARN` turns it off. |
+| `QUARKUS_LOG_CATEGORY__AUDIT__LEVEL` | `INFO` | The audit log, one line per request: an authenticated one as `principal=… action=… artifact=… decision=… status=…`, one answered 401 as `client=… request=… certificate=… token=… decision=unauthenticated status=401 reason=…`; `WARN` turns it off. |
+| `PROXY_LOG_TLS_HANDSHAKE_LEVEL` | `INFO` | `TRACE` logs every failed TLS handshake with its cause (`Connection failure` and the `SSLHandshakeException`): an untrusted client certificate, a client that rejects the proxy's certificate, no common protocol. These never become requests, so the audit log does not see them. Off by default, since a TCP health check that connects and closes counts as one too. |
 | `QUARKUS_SHUTDOWN_TIMEOUT` | `15S` | How long in-flight requests may finish on shutdown. |
 
 Readiness (`/q/health/ready`) is up once the policy file is loaded and, with Kafka ACLs enabled,
@@ -100,7 +101,7 @@ The image is the Quarkus fast-jar on `ubi9/openjdk-21-runtime`, pinned by tag an
 | Level | What | Run with |
 |---|---|---|
 | Unit and Quarkus tests | Request classification, policy parsing and reload, ACL evaluation, authorization decisions, principal mapping, and the HTTP resource end to end with test identities. | `mvn test` |
-| Smoke test | The built image over real TLS and mTLS against a stub registry: TLS listener, client-certificate authentication, mapping rules (no match → 401), policy grants (403), plain HTTP closed, policy reload. | `e2e/smoke-test.sh <image>` |
+| Smoke test | The built image over real TLS and mTLS against a stub registry: TLS listener, client-certificate authentication, mapping rules (no match → 401), policy grants (403), the log lines for 401s and failed TLS handshakes, plain HTTP closed, policy reload. | `e2e/smoke-test.sh <image>` |
 | Kafka integration test | The built image against a real Kafka broker (KRaft, mTLS, ACLs, the same mapping rules); the proxy reads the ACLs with its own certificate. LITERAL and PREFIXED patterns, `User:*`, DENY precedence, the DENY veto on policy grants, ACL changes at runtime. | `e2e/kafka-integration-test.sh <image>` |
 
 The two e2e scripts need Docker, `openssl`, `python3` and `curl`, and use the host network

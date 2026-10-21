@@ -29,7 +29,8 @@ rules:
 EOF
 
 start_stub_registry
-start_proxy "$IMAGE" -e 'PROXY_MTLS_PRINCIPAL_MAPPING_RULES=RULE:^CN=([^,]+),O=Acme$/CN=$1/'
+start_proxy "$IMAGE" -e 'PROXY_MTLS_PRINCIPAL_MAPPING_RULES=RULE:^CN=([^,]+),O=Acme$/CN=$1/' \
+    -e PROXY_LOG_TLS_HANDSHAKE_LEVEL=TRACE
 wait_until_ready
 
 check "readiness is up"                           200 "$(status "$PROXY/q/health/ready")"
@@ -38,8 +39,17 @@ check "policy principal is denied other artifact" 403 "$(as payments-app "$ARTIF
 check "certificate without any grant is denied"   403 "$(as orders-service "$ARTIFACTS/orders-value")"
 check "certificate no mapping rule matches"       401 "$(as stranger "$ARTIFACTS/orders-value")"
 check "request without certificate"               401 "$(status "$ARTIFACTS/payments-value")"
+check "client not trusting the proxy's certificate" 000 \
+    "$(curl -s -o /dev/null -w '%{http_code}' "$ARTIFACTS/payments-value" || true)"
 check "plain HTTP port 8082 is closed"            000 \
     "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://localhost:8082/q/health/ready || true)"
+
+# Requests answered 401 never reach the proxy resource, and failed handshakes never become requests
+logged "unmatched certificate is logged with its subject" \
+    'request="GET /apis/registry/v3/groups/default/artifacts/orders-value" certificate="CN=stranger,O=Other" token=no decision=unauthenticated status=401 reason="No principal mapping rule matches CN=stranger,O=Other"'
+logged "request without certificate is logged" \
+    'certificate=none token=no decision=unauthenticated status=401 reason="no client certificate and no bearer token"'
+logged "failed TLS handshake is logged" 'SSLHandshakeException'
 
 sed -i 's/\[payments-value\]/[payments-value, orders-value]/' "$WORK/policy/policy.yaml"
 eventually "changed policy is applied without a restart" 200 15 payments-app "$ARTIFACTS/orders-value"
