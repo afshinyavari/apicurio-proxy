@@ -112,9 +112,13 @@ eventually() {
     check "$description" "$expected" "$actual"
 }
 
-# logged <description> <extended regex>: checks that a proxy log line matches
+# logged <description> <extended regex>: checks that a proxy log line matches. The log is read
+# whole first: grep -q stopping at the first match would end docker logs with SIGPIPE, which
+# pipefail reports as no match.
 logged() {
-    if docker logs "$PROXY_CONTAINER" 2>&1 | grep -Eq "$2"; then
+    local log
+    log=$(docker logs "$PROXY_CONTAINER" 2>&1)
+    if grep -Eq "$2" <<<"$log"; then
         echo "ok    $1 (logged)"
     else
         echo "FAIL  $1: no log line matches $2"
