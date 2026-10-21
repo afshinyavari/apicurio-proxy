@@ -112,6 +112,16 @@ eventually() {
     check "$description" "$expected" "$actual"
 }
 
+# logged <description> <extended regex>: checks that a proxy log line matches
+logged() {
+    if docker logs "$PROXY_CONTAINER" 2>&1 | grep -Eq "$2"; then
+        echo "ok    $1 (logged)"
+    else
+        echo "FAIL  $1: no log line matches $2"
+        FAILED=1
+    fi
+}
+
 # finish: prints the proxy log and fails when a check failed
 finish() {
     if [ "$FAILED" != 0 ]; then
