@@ -1,6 +1,7 @@
 package se.afshin.yavari.rbac.security;
 
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.function.Predicate;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @QuarkusTest
 class AuthenticationFailureLogTest {
+
+    @Inject AuthenticationFailureLog log;
 
     private final List<String> lines = new CopyOnWriteArrayList<>();
 
@@ -35,6 +39,7 @@ class AuthenticationFailureLogTest {
 
     @BeforeEach
     void capture() {
+        log.summarize();   // forget the sources earlier tests left
         Logger.getLogger("audit").addHandler(capture);
     }
 
@@ -43,15 +48,23 @@ class AuthenticationFailureLogTest {
         Logger.getLogger("audit").removeHandler(capture);
     }
 
-    /** The line is written when the response has ended, which may be just after the client returns. */
+    private long count(Predicate<String> line) {
+        return lines.stream().filter(line).count();
+    }
+
+    private static boolean unauthenticated(String line) {
+        return line.contains("decision=unauthenticated") && line.contains("request=");
+    }
+
+    /** Lines are written when the response has ended, which may be just after the client returns. */
+    private void awaitLines(Predicate<String> line, long expected) throws InterruptedException {
+        for (int i = 0; i < 50 && count(line) < expected; i++) Thread.sleep(20);
+        assertThat(count(line)).as("lines in %s", lines).isEqualTo(expected);
+    }
+
     private String unauthenticatedLine() throws InterruptedException {
-        for (int i = 0; i < 50; i++) {
-            for (String line : lines) {
-                if (line.contains("decision=unauthenticated")) return line;
-            }
-            Thread.sleep(20);
-        }
-        throw new AssertionError("no unauthenticated audit line in " + lines);
+        awaitLines(AuthenticationFailureLogTest::unauthenticated, 1);
+        return lines.stream().filter(AuthenticationFailureLogTest::unauthenticated).findFirst().orElseThrow();
     }
 
     @Test
@@ -73,6 +86,30 @@ class AuthenticationFailureLogTest {
         assertThat(unauthenticatedLine())
                 .contains("request=\"DELETE /apis/registry/v3/groups/default/artifacts/orders\"")
                 .contains("certificate=none token=yes decision=unauthenticated status=401");
+    }
+
+    @Test
+    void repeatsAreSummarizedAndCountingStartsOver() throws InterruptedException {
+        for (int i = 0; i < 3; i++) {
+            given().get("/apis/registry/v3/groups/default/artifacts/orders-" + i).then().statusCode(401);
+        }
+        Thread.sleep(200);
+        awaitLines(AuthenticationFailureLogTest::unauthenticated, 1);
+
+        log.summarize();
+        assertThat(lines).anyMatch(line -> line.contains("certificate=none token=no decision=unauthenticated status=401 "
+                + "reason=\"no client certificate and no bearer token\" repeated=2 in=60s"));
+
+        given().get("/apis/registry/v3/groups/default/artifacts/orders").then().statusCode(401);
+        awaitLines(AuthenticationFailureLogTest::unauthenticated, 2);
+    }
+
+    @Test
+    void noSummaryWithoutRepeats() throws InterruptedException {
+        given().get("/apis/registry/v3/groups/default/artifacts/orders").then().statusCode(401);
+        unauthenticatedLine();
+        log.summarize();
+        assertThat(lines).noneMatch(line -> line.contains("repeated="));
     }
 
     @Test

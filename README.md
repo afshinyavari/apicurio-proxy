@@ -63,7 +63,8 @@ empty value counts as unset. Any other Quarkus property can be set the same way.
 | Variable | Default | Purpose |
 |---|---|---|
 | `QUARKUS_LOG_LEVEL` | `INFO` | Log level. |
-| `QUARKUS_LOG_CATEGORY__AUDIT__LEVEL` | `INFO` | The audit log, one line per request: an authenticated one as `principal=… action=… artifact=… decision=… status=…`, one answered 401 as `client=… request=… certificate=… token=… decision=unauthenticated status=401 reason=…`; `WARN` turns it off. |
+| `QUARKUS_LOG_CATEGORY__AUDIT__LEVEL` | `INFO` | The audit log, one line per request: an authenticated one as `principal=… action=… artifact=… decision=… status=…`, one answered 401 as `client=… request=… certificate=… token=… decision=unauthenticated status=401 reason=…`; `WARN` turns it off. A client that keeps failing gets one 401 line, then a summary per interval (`… repeated=523 in=60s`); `DEBUG` logs every repeat as well. |
+| `PROXY_AUDIT_REPEAT_SUMMARY_INTERVAL` | `60s` | How often repeated 401s are summarized. A source is the client address, certificate, token and reason; after its summary the next 401 is logged in full again. |
 | `PROXY_LOG_TLS_HANDSHAKE_LEVEL` | `INFO` | `TRACE` logs every failed TLS handshake with its cause (`Connection failure` and the `SSLHandshakeException`): an untrusted client certificate, a client that rejects the proxy's certificate, no common protocol. These never become requests, so the audit log does not see them. Off by default, since a TCP health check that connects and closes counts as one too. |
 | `QUARKUS_SHUTDOWN_TIMEOUT` | `15S` | How long in-flight requests may finish on shutdown. |
 
